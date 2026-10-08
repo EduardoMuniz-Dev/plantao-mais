@@ -58,6 +58,16 @@ Dados inválidos retornam `400 Bad Request` indicando cada campo com problema:
 }
 ```
 
+## Decisões técnicas
+
+- **H2 em memória, por enquanto.** Permite rodar o projeto com um comando e sem instalar banco. Os dados se perdem ao parar a aplicação. Na fase do Docker, a troca é para PostgreSQL.
+- **Validação na entrada com Bean Validation.** As regras (`@NotBlank`, `@NotNull`) ficam na entidade e o `@Valid` no controlador barra dados inválidos antes de chegar ao banco.
+- **Tratamento de erros centralizado.** Uma classe com `@RestControllerAdvice` converte falhas de validação em `400` com um corpo que indica cada campo inválido, em vez de repetir esse código em cada endpoint.
+- **Códigos HTTP deliberados.** `POST` devolve `201` com o cabeçalho `Location`. `DELETE` devolve `204` quando remove e `404` quando o id não existe. `PUT` e `DELETE` são idempotentes.
+- **`PUT` substitui o recurso inteiro.** Alterações parciais com `PATCH` não estão implementadas.
+- **Entidade exposta diretamente na API (limitação atual).** É simples, mas deixa o cliente enviar campos como o `id`. Na fase de segurança, será trocada por DTOs de entrada e saída.
+- **Código organizado por funcionalidade.** Os pacotes `plantao` e `erro` agrupam o que muda junto.
+
 ## Roteiro
 
 - [x] API REST com CRUD de plantões e códigos HTTP corretos
