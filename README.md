@@ -11,7 +11,7 @@ O Plantão+ nasceu da minha experiência como técnico em Enfermagem: coordenado
 ## Tecnologias
 
 - Java 21
-- Spring Boot 4 (Spring Web, Spring Data JPA, Bean Validation)
+- Spring Boot 4 (Spring Web, Spring Data JPA, Bean Validation, Spring Security)
 - Maven (via `mvnw`)
 - H2 (banco em memória, apenas nesta fase)
 
@@ -40,7 +40,7 @@ A API sobe em `http://localhost:8080`. Os dados ficam em memória e são apagado
 ### Exemplo
 
 ```bash
-curl -i -X POST localhost:8080/plantoes \
+curl -i -u coordenador:coord-dev -X POST localhost:8080/plantoes \
   -H "Content-Type: application/json" \
   -d '{"setor":"UTI","profissional":"Eduardo","inicio":"2026-10-10T19:00:00","fim":"2026-10-11T07:00:00"}'
 ```
@@ -58,6 +58,20 @@ Dados inválidos retornam `400 Bad Request` indicando cada campo com problema:
 }
 ```
 
+## Segurança
+
+Todas as rotas exigem autenticação (HTTP Basic) e a autorização é feita por papéis:
+
+| Papel         | Listar e buscar plantões | Criar, alterar e remover |
+|---------------|--------------------------|--------------------------|
+| `COORDENADOR` | sim                      | sim                      |
+| `TECNICO`     | sim                      | não (403)                |
+
+Sem credenciais, a API responde `401`. Com credenciais sem permissão, responde `403`.
+
+Usuários de **desenvolvimento local** (em memória; não usar em produção):
+`coordenador` / `coord-dev` e `tecnico` / `tec-dev`. Serão substituídos por autenticação OAuth2 com Keycloak.
+
 ## Decisões técnicas
 
 - **H2 em memória, por enquanto.** Permite rodar o projeto com um comando e sem instalar banco. Os dados se perdem ao parar a aplicação. Na fase do Docker, a troca é para PostgreSQL.
@@ -66,13 +80,17 @@ Dados inválidos retornam `400 Bad Request` indicando cada campo com problema:
 - **Códigos HTTP deliberados.** `POST` devolve `201` com o cabeçalho `Location`. `DELETE` devolve `204` quando remove e `404` quando o id não existe. `PUT` e `DELETE` são idempotentes.
 - **`PUT` substitui o recurso inteiro.** Alterações parciais com `PATCH` não estão implementadas.
 - **Entidade exposta diretamente na API (limitação atual).** É simples, mas deixa o cliente enviar campos como o `id`. Na fase de segurança, será trocada por DTOs de entrada e saída.
+- **API sem sessão e sem CSRF.** A API é stateless: as credenciais vão em cada pedido, então não há sessão de navegador para proteger com CSRF. Por isso o CSRF foi desligado de propósito.
+- **Autorização por papéis (RBAC).** Leitura para `COORDENADOR` e `TECNICO`; escrita só para `COORDENADOR`. Tudo que não foi listado exige autenticação.
+- **Senhas de desenvolvimento no código (limitação atual).** São apenas para uso local e ficam em memória com hash BCrypt. A fase do Keycloak remove esses usuários.
 - **Código organizado por funcionalidade.** Os pacotes `plantao` e `erro` agrupam o que muda junto.
 
 ## Roteiro
 
 - [x] API REST com CRUD de plantões e códigos HTTP corretos
 - [x] Validação de entrada com mensagens por campo
-- [ ] Spring Security com papéis (`COORDENADOR` e `TECNICO`) e DTOs
+- [x] Spring Security com papéis (`COORDENADOR` e `TECNICO`)
+- [ ] DTOs de entrada e saída no lugar da entidade exposta
 - [ ] Autenticação com OAuth2 e Keycloak (authorization code e client credentials)
 - [ ] PostgreSQL e Docker (`docker-compose`)
 - [ ] Front-end em TypeScript consumindo a API
