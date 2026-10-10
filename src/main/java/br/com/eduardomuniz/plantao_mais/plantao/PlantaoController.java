@@ -24,35 +24,30 @@ public class PlantaoController {
     }
 
     @GetMapping
-    public List<Plantao> listar() {
-        return repository.findAll();
+    public List<PlantaoResponse> listar() {
+        return repository.findAll().stream().map(PlantaoResponse::de).toList();
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Plantao> buscar(@PathVariable Long id) {
+    public ResponseEntity<PlantaoResponse> buscar(@PathVariable Long id) {
         return repository.findById(id)
-                .map(ResponseEntity::ok)
+                .map(p -> ResponseEntity.ok(PlantaoResponse.de(p)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ResponseEntity<Plantao> criar(@Valid @RequestBody Plantao plantao) {
-        Plantao salvo = repository.save(plantao);
+    public ResponseEntity<PlantaoResponse> criar(@Valid @RequestBody PlantaoRequest dados) {
+        Plantao salvo = repository.save(aplicar(new Plantao(), dados));
         URI local = URI.create("/plantoes/" + salvo.getId());
-        return ResponseEntity.created(local).body(salvo);
+        return ResponseEntity.created(local).body(PlantaoResponse.de(salvo));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Plantao> atualizar(@PathVariable Long id,
-                                             @Valid @RequestBody Plantao dados) {
+    public ResponseEntity<PlantaoResponse> atualizar(@PathVariable Long id,
+                                                     @Valid @RequestBody PlantaoRequest dados) {
         return repository.findById(id)
-                .map(existente -> {
-                    existente.setSetor(dados.getSetor());
-                    existente.setProfissional(dados.getProfissional());
-                    existente.setInicio(dados.getInicio());
-                    existente.setFim(dados.getFim());
-                    return ResponseEntity.ok(repository.save(existente));
-                })
+                .map(existente -> ResponseEntity.ok(
+                        PlantaoResponse.de(repository.save(aplicar(existente, dados)))))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -63,5 +58,13 @@ public class PlantaoController {
         }
         repository.deleteById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private Plantao aplicar(Plantao plantao, PlantaoRequest dados) {
+        plantao.setSetor(dados.setor());
+        plantao.setProfissional(dados.profissional());
+        plantao.setInicio(dados.inicio());
+        plantao.setFim(dados.fim());
+        return plantao;
     }
 }

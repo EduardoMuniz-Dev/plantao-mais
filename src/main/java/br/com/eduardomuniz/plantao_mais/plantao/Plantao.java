@@ -1,11 +1,10 @@
 package br.com.eduardomuniz.plantao_mais.plantao;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 
 @Entity
@@ -15,16 +14,16 @@ public class Plantao {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank
+    @Column(nullable = false)
     private String setor;
 
-    @NotBlank
+    @Column(nullable = false)
     private String profissional;
 
-    @NotNull
+    @Column(nullable = false)
     private LocalDateTime inicio;
 
-    @NotNull
+    @Column(nullable = false)
     private LocalDateTime fim;
 
     public Long getId() { return id; }
