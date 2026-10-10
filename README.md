@@ -13,19 +13,21 @@ O Plantão+ nasceu da minha experiência como técnico em Enfermagem: coordenado
 - Java 21
 - Spring Boot 4 (Spring Web, Spring Data JPA, Bean Validation, Spring Security)
 - Maven (via `mvnw`)
-- H2 (banco em memória, apenas nesta fase)
+- PostgreSQL 17
+- Docker e Docker Compose
 
 ## Como rodar
 
-Pré-requisito: JDK 21.
+Pré-requisitos: JDK 21 e Docker.
 
 ```bash
 git clone https://github.com/EduardoMuniz-Dev/plantao-mais.git
 cd plantao-mais
+docker compose up -d
 ./mvnw spring-boot:run
 ```
 
-A API sobe em `http://localhost:8080`. Os dados ficam em memória e são apagados quando a aplicação para.
+A API sobe em `http://localhost:8080`. O banco PostgreSQL roda em um container, e os dados ficam em um volume do Docker, então sobrevivem a reinícios da aplicação. A senha padrão do banco (`plantao_dev`) é apenas para desenvolvimento local; o banco só aceita conexões do próprio computador.
 
 ## Endpoints
 
@@ -74,7 +76,8 @@ Usuários de **desenvolvimento local** (em memória; não usar em produção):
 
 ## Decisões técnicas
 
-- **H2 em memória, por enquanto.** Permite rodar o projeto com um comando e sem instalar banco. Os dados se perdem ao parar a aplicação. Na fase do Docker, a troca é para PostgreSQL.
+- **PostgreSQL em container Docker.** Os dados ficam em disco, em um volume, e persistem entre reinícios. A porta é publicada só em `127.0.0.1`, para o banco não ficar exposto na rede.
+- **`ddl-auto=update` (limitação atual).** O Hibernate cria e ajusta as tabelas sozinho. É prático em desenvolvimento, mas em produção o esquema deve ser versionado com uma ferramenta de migração, como o Flyway.
 - **Validação na entrada com Bean Validation.** As regras (`@NotBlank`, `@NotNull`) ficam na entidade e o `@Valid` no controlador barra dados inválidos antes de chegar ao banco.
 - **Tratamento de erros centralizado.** Uma classe com `@RestControllerAdvice` converte falhas de validação em `400` com um corpo que indica cada campo inválido, em vez de repetir esse código em cada endpoint.
 - **Códigos HTTP deliberados.** `POST` devolve `201` com o cabeçalho `Location`. `DELETE` devolve `204` quando remove e `404` quando o id não existe. `PUT` e `DELETE` são idempotentes.
@@ -92,7 +95,8 @@ Usuários de **desenvolvimento local** (em memória; não usar em produção):
 - [x] Spring Security com papéis (`COORDENADOR` e `TECNICO`)
 - [x] DTOs de entrada e saída no lugar da entidade exposta
 - [ ] Autenticação com OAuth2 e Keycloak (authorization code e client credentials)
-- [ ] PostgreSQL e Docker (`docker-compose`)
+- [x] PostgreSQL com Docker Compose
+- [ ] Dockerfile da API, para subir tudo com um comando
 - [ ] Front-end em TypeScript consumindo a API
 - [ ] Documentação das decisões técnicas
 
