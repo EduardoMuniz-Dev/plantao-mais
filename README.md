@@ -79,7 +79,7 @@ Usuários de **desenvolvimento local** (em memória; não usar em produção):
 - **Tratamento de erros centralizado.** Uma classe com `@RestControllerAdvice` converte falhas de validação em `400` com um corpo que indica cada campo inválido, em vez de repetir esse código em cada endpoint.
 - **Códigos HTTP deliberados.** `POST` devolve `201` com o cabeçalho `Location`. `DELETE` devolve `204` quando remove e `404` quando o id não existe. `PUT` e `DELETE` são idempotentes.
 - **`PUT` substitui o recurso inteiro.** Alterações parciais com `PATCH` não estão implementadas.
-- **Entidade exposta diretamente na API (limitação atual).** É simples, mas deixa o cliente enviar campos como o `id`. Na fase de segurança, será trocada por DTOs de entrada e saída.
+- **DTOs de entrada e saída.** A API recebe `PlantaoRequest` e devolve `PlantaoResponse` (records), e não a entidade JPA. Assim o cliente não controla o `id` e o formato da API não fica amarrado à tabela. A validação mora no DTO de entrada.
 - **API sem sessão e sem CSRF.** A API é stateless: as credenciais vão em cada pedido, então não há sessão de navegador para proteger com CSRF. Por isso o CSRF foi desligado de propósito.
 - **Autorização por papéis (RBAC).** Leitura para `COORDENADOR` e `TECNICO`; escrita só para `COORDENADOR`. Tudo que não foi listado exige autenticação.
 - **Senhas de desenvolvimento no código (limitação atual).** São apenas para uso local e ficam em memória com hash BCrypt. A fase do Keycloak remove esses usuários.
@@ -90,7 +90,7 @@ Usuários de **desenvolvimento local** (em memória; não usar em produção):
 - [x] API REST com CRUD de plantões e códigos HTTP corretos
 - [x] Validação de entrada com mensagens por campo
 - [x] Spring Security com papéis (`COORDENADOR` e `TECNICO`)
-- [ ] DTOs de entrada e saída no lugar da entidade exposta
+- [x] DTOs de entrada e saída no lugar da entidade exposta
 - [ ] Autenticação com OAuth2 e Keycloak (authorization code e client credentials)
 - [ ] PostgreSQL e Docker (`docker-compose`)
 - [ ] Front-end em TypeScript consumindo a API
