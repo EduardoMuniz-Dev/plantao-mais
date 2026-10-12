@@ -1,5 +1,7 @@
 # Plantão+
 
+![CI](https://github.com/EduardoMuniz-Dev/plantao-mais/actions/workflows/ci.yml/badge.svg)
+
 API REST para gestão de escalas de plantão de uma unidade de saúde, desenvolvida com Java e Spring Boot.
 
 > **Status:** em desenvolvimento. Projeto de estudo, construído por fases.
@@ -15,19 +17,38 @@ O Plantão+ nasceu da minha experiência como técnico em Enfermagem: coordenado
 - Maven (via `mvnw`)
 - PostgreSQL 17
 - Docker e Docker Compose
+- GitHub Actions (integração contínua)
 
 ## Como rodar
 
-Pré-requisitos: JDK 21 e Docker.
+Pré-requisito: Docker.
 
 ```bash
 git clone https://github.com/EduardoMuniz-Dev/plantao-mais.git
 cd plantao-mais
-docker compose up -d
+docker compose up --build
+```
+
+A primeira execução demora alguns minutos, porque baixa as imagens e as dependências. A API sobe em `http://localhost:8080`, junto com o PostgreSQL. Os dados ficam em um volume do Docker e sobrevivem a reinícios. A senha padrão do banco (`plantao_dev`) é apenas para desenvolvimento local; as portas só aceitam conexões do próprio computador.
+
+### Modo desenvolvimento
+
+Para rodar a API pela IDE ou pelo Maven, suba só o banco (pré-requisitos: JDK 21 e Docker):
+
+```bash
+docker compose up -d db
 ./mvnw spring-boot:run
 ```
 
-A API sobe em `http://localhost:8080`. O banco PostgreSQL roda em um container, e os dados ficam em um volume do Docker, então sobrevivem a reinícios da aplicação. A senha padrão do banco (`plantao_dev`) é apenas para desenvolvimento local; o banco só aceita conexões do próprio computador.
+### Testes
+
+Com o banco de pé (`docker compose up -d db`):
+
+```bash
+./mvnw verify
+```
+
+Os mesmos testes rodam automaticamente no GitHub Actions a cada push na `main`.
 
 ## Endpoints
 
@@ -77,6 +98,10 @@ Usuários de **desenvolvimento local** (em memória; não usar em produção):
 ## Decisões técnicas
 
 - **PostgreSQL em container Docker.** Os dados ficam em disco, em um volume, e persistem entre reinícios. A porta é publicada só em `127.0.0.1`, para o banco não ficar exposto na rede.
+- **Imagem da API em duas etapas (multi-stage).** A primeira etapa compila o projeto com o JDK; a imagem final leva só o JRE e o jar, o que a deixa menor, e roda com um usuário sem privilégios em vez de `root`.
+- **Configuração por variáveis de ambiente.** O `application.properties` serve para rodar na máquina (`localhost`). No Compose, variáveis como `SPRING_DATASOURCE_URL` e `SERVER_ADDRESS` sobrescrevem esses valores para o ambiente de container, sem duplicar arquivos de configuração. A API continua publicada apenas em `127.0.0.1` no computador.
+- **Espera pelo banco.** O serviço da API só inicia depois que o healthcheck do PostgreSQL (`pg_isready`) confirma que ele aceita conexões.
+- **Integração contínua com GitHub Actions.** A cada push na `main` e em pull requests, um workflow sobe um PostgreSQL e roda `./mvnw verify`, para que um commit que quebra os testes seja percebido logo.
 - **`ddl-auto=update` (limitação atual).** O Hibernate cria e ajusta as tabelas sozinho. É prático em desenvolvimento, mas em produção o esquema deve ser versionado com uma ferramenta de migração, como o Flyway.
 - **Validação na entrada com Bean Validation.** As regras (`@NotBlank`, `@NotNull`) ficam na entidade e o `@Valid` no controlador barra dados inválidos antes de chegar ao banco.
 - **Tratamento de erros centralizado.** Uma classe com `@RestControllerAdvice` converte falhas de validação em `400` com um corpo que indica cada campo inválido, em vez de repetir esse código em cada endpoint.
@@ -94,11 +119,13 @@ Usuários de **desenvolvimento local** (em memória; não usar em produção):
 - [x] Validação de entrada com mensagens por campo
 - [x] Spring Security com papéis (`COORDENADOR` e `TECNICO`)
 - [x] DTOs de entrada e saída no lugar da entidade exposta
-- [ ] Autenticação com OAuth2 e Keycloak (authorization code e client credentials)
 - [x] PostgreSQL com Docker Compose
-- [ ] Dockerfile da API, para subir tudo com um comando
+- [x] Dockerfile da API, para subir tudo com um comando
+- [x] Testes de integração e CI com GitHub Actions
+- [x] Documentação das decisões técnicas
+- [ ] Documentação interativa da API com Swagger/OpenAPI
+- [ ] Autenticação com OAuth2 e Keycloak (authorization code e client credentials)
 - [ ] Front-end em TypeScript consumindo a API
-- [ ] Documentação das decisões técnicas
 
 ## Autor
 
