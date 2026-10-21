@@ -8,7 +8,7 @@ API REST para gestão de escalas de plantão de uma unidade de saúde, desenvolv
 
 ## Sobre o projeto
 
-O Plantão+ nasceu da minha experiência como técnico em Enfermagem: coordenadores montam a escala da unidade e os profissionais consultam seus plantões. A ideia é cobrir, na prática, o que se espera de uma API de back-end profissional: REST, validação, segurança com papéis, autenticação com OAuth2, banco relacional e containers.
+O Plantão+ nasceu da minha experiência como técnico em Enfermagem: coordenadores montam a escala da unidade e os profissionais consultam seus plantões. A ideia é cobrir, na prática, o que se espera de uma API de back-end profissional: REST, validação, segurança com papéis, banco relacional e containers, com autenticação OAuth2 prevista nas próximas fases.
 
 ## Tecnologias
 
@@ -42,7 +42,7 @@ docker compose up -d db
 
 ### Testes
 
-Com o banco de pé (`docker compose up -d db`):
+Com o banco rodando (`docker compose up -d db`):
 
 ```bash
 ./mvnw verify
@@ -51,6 +51,8 @@ Com o banco de pé (`docker compose up -d db`):
 Os mesmos testes rodam automaticamente no GitHub Actions a cada push na `main`.
 
 ## Endpoints
+
+Todas as rotas exigem autenticação (veja a seção [Segurança](#segurança)).
 
 | Método | Rota             | Descrição                  | Resposta de sucesso |
 |--------|------------------|----------------------------|---------------------|
@@ -66,6 +68,20 @@ Os mesmos testes rodam automaticamente no GitHub Actions a cada push na `main`.
 curl -i -u coordenador:coord-dev -X POST localhost:8080/plantoes \
   -H "Content-Type: application/json" \
   -d '{"setor":"UTI","profissional":"Eduardo","inicio":"2026-10-10T19:00:00","fim":"2026-10-11T07:00:00"}'
+```
+
+### Resposta
+
+O `POST` acima devolve `201 Created` com o cabeçalho `Location: /plantoes/1` e o corpo:
+
+```json
+{
+  "id": 1,
+  "setor": "UTI",
+  "profissional": "Eduardo",
+  "inicio": "2026-10-10T19:00:00",
+  "fim": "2026-10-11T07:00:00"
+}
 ```
 
 ### Validação
@@ -103,7 +119,7 @@ Usuários de **desenvolvimento local** (em memória; não usar em produção):
 - **Espera pelo banco.** O serviço da API só inicia depois que o healthcheck do PostgreSQL (`pg_isready`) confirma que ele aceita conexões.
 - **Integração contínua com GitHub Actions.** A cada push na `main` e em pull requests, um workflow sobe um PostgreSQL e roda `./mvnw verify`, para que um commit que quebra os testes seja percebido logo.
 - **`ddl-auto=update` (limitação atual).** O Hibernate cria e ajusta as tabelas sozinho. É prático em desenvolvimento, mas em produção o esquema deve ser versionado com uma ferramenta de migração, como o Flyway.
-- **Validação na entrada com Bean Validation.** As regras (`@NotBlank`, `@NotNull`) ficam na entidade e o `@Valid` no controlador barra dados inválidos antes de chegar ao banco.
+- **Validação na entrada com Bean Validation.** As regras (`@NotBlank`, `@NotNull`) ficam no DTO de entrada e o `@Valid` no controlador barra dados inválidos antes de chegar ao banco.
 - **Tratamento de erros centralizado.** Uma classe com `@RestControllerAdvice` converte falhas de validação em `400` com um corpo que indica cada campo inválido, em vez de repetir esse código em cada endpoint.
 - **Códigos HTTP deliberados.** `POST` devolve `201` com o cabeçalho `Location`. `DELETE` devolve `204` quando remove e `404` quando o id não existe. `PUT` e `DELETE` são idempotentes.
 - **`PUT` substitui o recurso inteiro.** Alterações parciais com `PATCH` não estão implementadas.
