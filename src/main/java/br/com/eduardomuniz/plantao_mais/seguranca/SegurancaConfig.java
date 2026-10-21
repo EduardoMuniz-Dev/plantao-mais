@@ -26,6 +26,7 @@ public class SegurancaConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/error").permitAll()
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers(HttpMethod.GET, "/plantoes/**").hasAnyRole("COORDENADOR", "TECNICO")
                 .requestMatchers("/plantoes/**").hasRole("COORDENADOR")
                 .anyRequest().authenticated())
