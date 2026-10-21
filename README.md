@@ -43,7 +43,7 @@ docker compose up -d db
 
 ### Testes
 
-Com o banco rodando (`docker compose up -d db`):
+Os testes usam um banco H2 em memória, então não precisam de Docker:
 
 ```bash
 ./mvnw verify
@@ -122,7 +122,7 @@ Usuários de **desenvolvimento local** (em memória; não usar em produção):
 - **Imagem da API em duas etapas (multi-stage).** A primeira etapa compila o projeto com o JDK; a imagem final leva só o JRE e o jar, o que a deixa menor, e roda com um usuário sem privilégios em vez de `root`.
 - **Configuração por variáveis de ambiente.** O `application.properties` serve para rodar na máquina (`localhost`). No Compose, variáveis como `SPRING_DATASOURCE_URL` e `SERVER_ADDRESS` sobrescrevem esses valores para o ambiente de container, sem duplicar arquivos de configuração. A API continua publicada apenas em `127.0.0.1` no computador.
 - **Espera pelo banco.** O serviço da API só inicia depois que o healthcheck do PostgreSQL (`pg_isready`) confirma que ele aceita conexões.
-- **Integração contínua com GitHub Actions.** A cada push na `main` e em pull requests, um workflow sobe um PostgreSQL e roda `./mvnw verify`, para que um commit que quebra os testes seja percebido logo.
+- **Integração contínua com GitHub Actions.** A cada push na `main` e em pull requests, um workflow roda `./mvnw verify`, para que um commit que quebra os testes seja percebido logo.
 - **`ddl-auto=update` (limitação atual).** O Hibernate cria e ajusta as tabelas sozinho. É prático em desenvolvimento, mas em produção o esquema deve ser versionado com uma ferramenta de migração, como o Flyway.
 - **Validação na entrada com Bean Validation.** As regras (`@NotBlank`, `@NotNull`) ficam no DTO de entrada e o `@Valid` no controlador barra dados inválidos antes de chegar ao banco.
 - **Tratamento de erros centralizado.** Uma classe com `@RestControllerAdvice` converte falhas de validação em `400` com um corpo que indica cada campo inválido, em vez de repetir esse código em cada endpoint.
