@@ -15,6 +15,7 @@ O Plantão+ nasceu da minha experiência como técnico em Enfermagem: coordenado
 - Java 21
 - Spring Boot 4 (Spring Web, Spring Data JPA, Bean Validation, Spring Security)
 - Maven (via `mvnw`)
+- springdoc-openapi 3 (documentação OpenAPI e Swagger UI)
 - PostgreSQL 17
 - Docker e Docker Compose
 - GitHub Actions (integração contínua)
@@ -97,6 +98,10 @@ Dados inválidos retornam `400 Bad Request` indicando cada campo com problema:
 }
 ```
 
+## Documentação da API
+
+Com a aplicação rodando, a documentação interativa (Swagger UI) fica em `http://localhost:8080/swagger-ui/index.html` e a especificação OpenAPI em `http://localhost:8080/v3/api-docs`. Use o botão **Authorize** com um dos usuários de desenvolvimento (veja a seção de segurança) para testar os endpoints direto pelo navegador.
+
 ## Segurança
 
 Todas as rotas exigem autenticação (HTTP Basic) e a autorização é feita por papéis:
@@ -127,7 +132,8 @@ Usuários de **desenvolvimento local** (em memória; não usar em produção):
 - **API sem sessão e sem CSRF.** A API é stateless: as credenciais vão em cada pedido, então não há sessão de navegador para proteger com CSRF. Por isso o CSRF foi desligado de propósito.
 - **Autorização por papéis (RBAC).** Leitura para `COORDENADOR` e `TECNICO`; escrita só para `COORDENADOR`. Tudo que não foi listado exige autenticação.
 - **Senhas de desenvolvimento no código (limitação atual).** São apenas para uso local e ficam em memória com hash BCrypt. A fase do Keycloak remove esses usuários.
-- **Código organizado por funcionalidade.** Os pacotes `plantao` e `erro` agrupam o que muda junto.
+- **Documentação aberta em desenvolvimento (limitação atual).** As rotas `/swagger-ui` e `/v3/api-docs` são liberadas sem autenticação, mas os endpoints da API continuam protegidos. Em produção, a documentação deve ser restringida ou desligada (`springdoc.api-docs.enabled=false` e `springdoc.swagger-ui.enabled=false`).
+- **Código organizado por funcionalidade.** Os pacotes `plantao`, `seguranca`, `erro` e `documentacao` agrupam o que muda junto.
 
 ## Roteiro
 
@@ -139,7 +145,7 @@ Usuários de **desenvolvimento local** (em memória; não usar em produção):
 - [x] Dockerfile da API, para subir tudo com um comando
 - [x] Testes de integração e CI com GitHub Actions
 - [x] Documentação das decisões técnicas
-- [ ] Documentação interativa da API com Swagger/OpenAPI
+- [x] Documentação interativa da API com Swagger/OpenAPI
 - [ ] Autenticação com OAuth2 e Keycloak (authorization code e client credentials)
 - [ ] Front-end em TypeScript consumindo a API
 
