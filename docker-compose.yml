@@ -24,6 +24,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/plantao
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-plantao_dev}
       SERVER_ADDRESS: 0.0.0.0
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/plantao/protocol/openid-connect/certs
     ports:
       - "127.0.0.1:8080:8080"
 
