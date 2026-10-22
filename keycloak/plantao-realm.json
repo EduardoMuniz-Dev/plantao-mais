@@ -1,0 +1,50 @@
+{
+  "realm": "plantao",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      { "name": "COORDENADOR" },
+      { "name": "TECNICO" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "plantao-m2m",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${PLANTAO_M2M_SECRET}",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-plantao-m2m",
+      "enabled": true,
+      "serviceAccountClientId": "plantao-m2m",
+      "realmRoles": ["COORDENADOR"]
+    },
+    {
+      "username": "coordenador",
+      "enabled": true,
+      "email": "coordenador@plantao.local",
+      "emailVerified": true,
+      "firstName": "Coord",
+      "lastName": "Dev",
+      "credentials": [{ "type": "password", "value": "coord-dev", "temporary": false }],
+      "realmRoles": ["COORDENADOR"]
+    },
+    {
+      "username": "tecnico",
+      "enabled": true,
+      "email": "tecnico@plantao.local",
+      "emailVerified": true,
+      "firstName": "Tec",
+      "lastName": "Dev",
+      "credentials": [{ "type": "password", "value": "tec-dev", "temporary": false }],
+      "realmRoles": ["TECNICO"]
+    }
+  ]
+}

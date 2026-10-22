@@ -30,14 +30,16 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.3
-    command: start-dev
+    command: start-dev --import-realm
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin_dev}
+      PLANTAO_M2M_SECRET: ${PLANTAO_M2M_SECRET:-plantao_m2m_dev}
     ports:
       - "127.0.0.1:8180:8080"
     volumes:
       - keycloak-dados:/opt/keycloak/data
+      - ./keycloak/plantao-realm.json:/opt/keycloak/data/import/plantao-realm.json:ro
 
 volumes:
   plantao-dados:
