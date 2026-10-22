@@ -1,18 +1,17 @@
 package br.com.eduardomuniz.plantao_mais.seguranca;
 
-import org.springframework.beans.factory.annotation.Value;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -30,23 +29,23 @@ public class SegurancaConfig {
                 .requestMatchers(HttpMethod.GET, "/plantoes/**").hasAnyRole("COORDENADOR", "TECNICO")
                 .requestMatchers("/plantoes/**").hasRole("COORDENADOR")
                 .anyRequest().authenticated())
-            .httpBasic(Customizer.withDefaults());
+            .oauth2ResourceServer(oauth2 -> oauth2
+                .jwt(jwt -> jwt.jwtAuthenticationConverter(conversorDePapeis())));
         return http.build();
     }
 
-    @Bean
-    PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    @Bean
-    UserDetailsService usuarios(PasswordEncoder encoder,
-            @Value("${plantao.seguranca.senha-coordenador:coord-dev}") String senhaCoordenador,
-            @Value("${plantao.seguranca.senha-tecnico:tec-dev}") String senhaTecnico) {
-        return new InMemoryUserDetailsManager(
-            User.withUsername("coordenador")
-                .password(encoder.encode(senhaCoordenador)).roles("COORDENADOR").build(),
-            User.withUsername("tecnico")
-                .password(encoder.encode(senhaTecnico)).roles("TECNICO").build());
+    /** Converte realm_access.roles do token do Keycloak em ROLE_COORDENADOR, ROLE_TECNICO etc. */
+    private JwtAuthenticationConverter conversorDePapeis() {
+        JwtAuthenticationConverter conversor = new JwtAuthenticationConverter();
+        conversor.setJwtGrantedAuthoritiesConverter(jwt -> {
+            Map<String, Object> acesso = jwt.getClaimAsMap("realm_access");
+            if (acesso == null || !(acesso.get("roles") instanceof Collection<?> papeis)) {
+                return List.<GrantedAuthority>of();
+            }
+            return papeis.stream()
+                    .map(papel -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + papel))
+                    .toList();
+        });
+        return conversor;
     }
 }

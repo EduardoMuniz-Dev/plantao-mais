@@ -8,13 +8,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jwt.BadJwtException;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -41,45 +47,63 @@ class PlantaoControllerTest {
             }
             """;
 
+    /**
+     * Decodificador de teste: "coordenador" e "tecnico" viram tokens com o papel
+     * correspondente em realm_access.roles, como o Keycloak emite. Qualquer outro
+     * valor é rejeitado, como seria um token inválido. Assim os testes não
+     * dependem de um Keycloak rodando.
+     */
+    @TestConfiguration
+    static class JwtDeTeste {
+        @Bean
+        JwtDecoder jwtDecoder() {
+            return token -> {
+                List<String> papeis = switch (token) {
+                    case "coordenador" -> List.of("COORDENADOR");
+                    case "tecnico" -> List.of("TECNICO");
+                    default -> throw new BadJwtException("Token inválido");
+                };
+                Instant agora = Instant.now();
+                return Jwt.withTokenValue(token)
+                        .header("alg", "none")
+                        .subject(token)
+                        .issuedAt(agora)
+                        .expiresAt(agora.plusSeconds(300))
+                        .claim("realm_access", Map.of("roles", papeis))
+                        .build();
+            };
+        }
+    }
+
     @Autowired
     private MockMvc mvc;
 
-    private static String basic(String usuario, String senha) {
-        String credenciais = usuario + ":" + senha;
-        return "Basic " + Base64.getEncoder()
-                .encodeToString(credenciais.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static String coordenador() {
-        return basic("coordenador", "coord-dev");
-    }
-
-    private static String tecnico() {
-        return basic("tecnico", "tec-dev");
+    private static String bearer(String token) {
+        return "Bearer " + token;
     }
 
     @Test
-    void semLoginRetorna401() throws Exception {
+    void semTokenRetorna401() throws Exception {
         mvc.perform(get("/plantoes"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
-    void senhaErradaRetorna401() throws Exception {
-        mvc.perform(get("/plantoes").header("Authorization", basic("coordenador", "errada")))
+    void tokenInvalidoRetorna401() throws Exception {
+        mvc.perform(get("/plantoes").header("Authorization", bearer("invalido")))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void tecnicoPodeListar() throws Exception {
-        mvc.perform(get("/plantoes").header("Authorization", tecnico()))
+        mvc.perform(get("/plantoes").header("Authorization", bearer("tecnico")))
                 .andExpect(status().isOk());
     }
 
     @Test
     void tecnicoNaoPodeCriar() throws Exception {
         mvc.perform(post("/plantoes")
-                        .header("Authorization", tecnico())
+                        .header("Authorization", bearer("tecnico"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(PLANTAO_VALIDO))
                 .andExpect(status().isForbidden());
@@ -88,7 +112,7 @@ class PlantaoControllerTest {
     @Test
     void coordenadorPodeCriar() throws Exception {
         mvc.perform(post("/plantoes")
-                        .header("Authorization", coordenador())
+                        .header("Authorization", bearer("coordenador"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(PLANTAO_VALIDO))
                 .andExpect(status().isCreated())
@@ -99,7 +123,7 @@ class PlantaoControllerTest {
     @Test
     void dadosInvalidosRetornam400() throws Exception {
         mvc.perform(post("/plantoes")
-                        .header("Authorization", coordenador())
+                        .header("Authorization", bearer("coordenador"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(PLANTAO_INVALIDO))
                 .andExpect(status().isBadRequest());
@@ -107,23 +131,23 @@ class PlantaoControllerTest {
 
     @Test
     void buscarInexistenteRetorna404() throws Exception {
-        mvc.perform(get("/plantoes/999999").header("Authorization", coordenador()))
+        mvc.perform(get("/plantoes/999999").header("Authorization", bearer("coordenador")))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void coordenadorPodeRemoverPlantao() throws Exception {
         String local = mvc.perform(post("/plantoes")
-                        .header("Authorization", coordenador())
+                        .header("Authorization", bearer("coordenador"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(PLANTAO_VALIDO))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getHeader("Location");
         assertNotNull(local);
 
-        mvc.perform(delete(local).header("Authorization", coordenador()))
+        mvc.perform(delete(local).header("Authorization", bearer("coordenador")))
                 .andExpect(status().isNoContent());
-        mvc.perform(get(local).header("Authorization", coordenador()))
+        mvc.perform(get(local).header("Authorization", bearer("coordenador")))
                 .andExpect(status().isNotFound());
     }
 }

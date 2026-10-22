@@ -18,8 +18,8 @@ public class OpenApiConfig {
                 .title("Plantão+ API")
                 .version("0.1.0")
                 .description("API REST para gestão de escalas de plantão de uma unidade de saúde."))
-            .components(new Components().addSecuritySchemes("basicAuth",
-                new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("basic")))
-            .addSecurityItem(new SecurityRequirement().addList("basicAuth"));
+            .components(new Components().addSecuritySchemes("bearerAuth",
+                new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")))
+            .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
     }
 }
