@@ -77,7 +77,7 @@ Para testar o papel `TECNICO`, em desenvolvimento dá para pedir o token de um u
 
 ```bash
 TOKEN_TECNICO=$(curl -s -X POST http://localhost:8180/realms/plantao/protocol/openid-connect/token \
-  -d grant_type=password -d client_id=admin-cli \
+  -d grant_type=password -d client_id=plantao-web \
   -d username=tecnico -d password=tec-dev \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 ```
