@@ -8,12 +8,13 @@ API REST para gestão de escalas de plantão de uma unidade de saúde, desenvolv
 
 ## Sobre o projeto
 
-O Plantão+ nasceu da minha experiência como técnico em Enfermagem: coordenadores montam a escala da unidade e os profissionais consultam seus plantões. A ideia é cobrir, na prática, o que se espera de uma API de back-end profissional: REST, validação, segurança com papéis, banco relacional e containers, com autenticação OAuth2 prevista nas próximas fases.
+O Plantão+ nasceu da minha experiência como técnico em Enfermagem: coordenadores montam a escala da unidade e os profissionais consultam seus plantões. A ideia é cobrir, na prática, o que se espera de uma API de back-end profissional: REST, validação, segurança com papéis, autenticação OAuth2 com Keycloak, banco relacional e containers.
 
 ## Tecnologias
 
 - Java 21
-- Spring Boot 4 (Spring Web, Spring Data JPA, Bean Validation, Spring Security)
+- Spring Boot 4 (Spring Web, Spring Data JPA, Bean Validation, Spring Security com OAuth2 Resource Server)
+- Keycloak 26 (servidor de identidade; emite os tokens JWT)
 - Maven (via `mvnw`)
 - springdoc-openapi 3 (documentação OpenAPI e Swagger UI)
 - PostgreSQL 17
@@ -30,20 +31,30 @@ cd plantao-mais
 docker compose up --build
 ```
 
-A primeira execução demora alguns minutos, porque baixa as imagens e as dependências. A API sobe em `http://localhost:8080`, junto com o PostgreSQL. Os dados ficam em um volume do Docker e sobrevivem a reinícios. A senha padrão do banco (`plantao_dev`) é apenas para desenvolvimento local; as portas só aceitam conexões do próprio computador.
+Sobem três serviços: o PostgreSQL, o Keycloak (que importa o realm `plantao` de `keycloak/plantao-realm.json`) e a API.
+
+| Serviço  | Endereço                | Observação                                  |
+|----------|-------------------------|---------------------------------------------|
+| API      | `http://localhost:8080` | Exige token (veja a seção abaixo)           |
+| Keycloak | `http://localhost:8180` | Painel de administração: `admin` / `admin_dev` |
+| Banco    | `localhost:5432`        | Usuário `plantao`, senha `plantao_dev`      |
+
+A primeira execução demora alguns minutos, porque baixa as imagens e as dependências, e o Keycloak leva cerca de 1 minuto para ficar pronto. Os dados ficam em volumes do Docker e sobrevivem a reinícios. As senhas padrão (banco, admin do Keycloak e secret do client) são apenas para desenvolvimento local e podem ser trocadas pelas variáveis de ambiente `POSTGRES_PASSWORD`, `KEYCLOAK_ADMIN_PASSWORD` e `PLANTAO_M2M_SECRET`. As portas só aceitam conexões do próprio computador.
+
+O Keycloak só importa o realm quando ele ainda não existe. Para recriá-lo a partir do arquivo, use `docker compose down -v` (atenção: isso apaga também os dados do banco).
 
 ### Modo desenvolvimento
 
-Para rodar a API pela IDE ou pelo Maven, suba só o banco (pré-requisitos: JDK 21 e Docker):
+Para rodar a API pela IDE ou pelo Maven, suba só o banco e o Keycloak (pré-requisitos: JDK 21 e Docker):
 
 ```bash
-docker compose up -d db
+docker compose up -d db keycloak
 ./mvnw spring-boot:run
 ```
 
 ### Testes
 
-Os testes usam um banco H2 em memória, então não precisam de Docker:
+Os testes usam um banco H2 em memória e um `JwtDecoder` de teste, que transforma tokens fictícios em tokens com os papéis `COORDENADOR` e `TECNICO`. Por isso não precisam de Docker nem do Keycloak:
 
 ```bash
 ./mvnw verify
@@ -51,9 +62,31 @@ Os testes usam um banco H2 em memória, então não precisam de Docker:
 
 Os mesmos testes rodam automaticamente no GitHub Actions a cada push na `main`.
 
+## Como obter um token
+
+A API não tem tela de login nem guarda senhas: ela valida tokens emitidos pelo Keycloak. Para chamar a API sem usuário (por exemplo, um script), use o client `plantao-m2m` com o fluxo **client credentials**. A conta de serviço dele tem o papel `COORDENADOR`:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8180/realms/plantao/protocol/openid-connect/token \
+  -d grant_type=client_credentials -d client_id=plantao-m2m \
+  -d client_secret=plantao_m2m_dev \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+```
+
+Para testar o papel `TECNICO`, em desenvolvimento dá para pedir o token de um usuário de teste (o login por tela, com authorization code, virá com o front-end):
+
+```bash
+TOKEN_TECNICO=$(curl -s -X POST http://localhost:8180/realms/plantao/protocol/openid-connect/token \
+  -d grant_type=password -d client_id=admin-cli \
+  -d username=tecnico -d password=tec-dev \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+```
+
+Os tokens duram 5 minutos.
+
 ## Endpoints
 
-Todas as rotas exigem autenticação (veja a seção [Segurança](#segurança)).
+Todas as rotas exigem o cabeçalho `Authorization: Bearer <token>`.
 
 | Método | Rota             | Descrição                  | Resposta de sucesso |
 |--------|------------------|----------------------------|---------------------|
@@ -66,7 +99,8 @@ Todas as rotas exigem autenticação (veja a seção [Segurança](#segurança)).
 ### Exemplo
 
 ```bash
-curl -i -u coordenador:coord-dev -X POST localhost:8080/plantoes \
+curl -i -X POST localhost:8080/plantoes \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"setor":"UTI","profissional":"Eduardo","inicio":"2026-10-10T19:00:00","fim":"2026-10-11T07:00:00"}'
 ```
@@ -100,21 +134,20 @@ Dados inválidos retornam `400 Bad Request` indicando cada campo com problema:
 
 ## Documentação da API
 
-Com a aplicação rodando, a documentação interativa (Swagger UI) fica em `http://localhost:8080/swagger-ui/index.html` e a especificação OpenAPI em `http://localhost:8080/v3/api-docs`. Use o botão **Authorize** com um dos usuários de desenvolvimento (veja a seção de segurança) para testar os endpoints direto pelo navegador.
+Com a aplicação rodando, a documentação interativa (Swagger UI) fica em `http://localhost:8080/swagger-ui/index.html` e a especificação OpenAPI em `http://localhost:8080/v3/api-docs`. Use o botão **Authorize** e cole um token (veja a seção anterior) para testar os endpoints direto pelo navegador.
 
 ## Segurança
 
-Todas as rotas exigem autenticação (HTTP Basic) e a autorização é feita por papéis:
+A API é um *resource server* OAuth2: ela não emite tokens. A cada pedido, valida a assinatura, o emissor e a validade do JWT enviado e autoriza pelos papéis do realm, lidos do campo `realm_access.roles` do token.
 
 | Papel         | Listar e buscar plantões | Criar, alterar e remover |
 |---------------|--------------------------|--------------------------|
 | `COORDENADOR` | sim                      | sim                      |
 | `TECNICO`     | sim                      | não (403)                |
 
-Sem credenciais, a API responde `401`. Com credenciais sem permissão, responde `403`.
+Sem token, ou com token inválido ou expirado, a API responde `401`. Com token sem permissão, responde `403`.
 
-Usuários de **desenvolvimento local** (em memória; não usar em produção):
-`coordenador` / `coord-dev` e `tecnico` / `tec-dev`. Serão substituídos por autenticação OAuth2 com Keycloak.
+O realm `plantao` (papéis, client `plantao-m2m` e usuários de teste) está versionado em `keycloak/plantao-realm.json` e é importado automaticamente quando o Keycloak sobe. Usuários de **desenvolvimento local**: `coordenador` / `coord-dev` e `tecnico` / `tec-dev`. São apenas para uso local, não para produção.
 
 ## Decisões técnicas
 
@@ -129,9 +162,13 @@ Usuários de **desenvolvimento local** (em memória; não usar em produção):
 - **Códigos HTTP deliberados.** `POST` devolve `201` com o cabeçalho `Location`. `DELETE` devolve `204` quando remove e `404` quando o id não existe. `PUT` e `DELETE` são idempotentes.
 - **`PUT` substitui o recurso inteiro.** Alterações parciais com `PATCH` não estão implementadas.
 - **DTOs de entrada e saída.** A API recebe `PlantaoRequest` e devolve `PlantaoResponse` (records), e não a entidade JPA. Assim o cliente não controla o `id` e o formato da API não fica amarrado à tabela. A validação mora no DTO de entrada.
-- **API sem sessão e sem CSRF.** A API é stateless: as credenciais vão em cada pedido, então não há sessão de navegador para proteger com CSRF. Por isso o CSRF foi desligado de propósito.
+- **Autenticação delegada ao Keycloak.** A API valida JWTs em vez de guardar usuários e senhas. Um conversor transforma `realm_access.roles` do token em autoridades do Spring (`ROLE_COORDENADOR`, `ROLE_TECNICO`), e as regras de acesso continuam no `SegurancaConfig`.
+- **API sem sessão e sem CSRF.** A API é stateless: o token vai em cada pedido, então não há sessão de navegador para proteger com CSRF. Por isso o CSRF foi desligado de propósito.
 - **Autorização por papéis (RBAC).** Leitura para `COORDENADOR` e `TECNICO`; escrita só para `COORDENADOR`. Tudo que não foi listado exige autenticação.
-- **Senhas de desenvolvimento no código (limitação atual).** São apenas para uso local e ficam em memória com hash BCrypt. A fase do Keycloak remove esses usuários.
+- **Chaves pela rede interna, emissor pelo endereço público.** No Compose, a API busca as chaves de assinatura em `keycloak:8080` (`jwk-set-uri`), mas continua exigindo que o `iss` do token seja `http://localhost:8180/realms/plantao`, o endereço pelo qual os clientes pedem o token. Dentro do container, `localhost` não alcança o Keycloak.
+- **Realm do Keycloak versionado.** O arquivo `keycloak/plantao-realm.json` descreve papéis, client e usuários de teste, e o Compose o importa ao subir. Quem clona o repositório tem o mesmo ambiente, sem configurar nada no painel. O secret do client vem de uma variável de ambiente.
+- **Testes sem Keycloak.** Os testes de integração trocam o `JwtDecoder` por um de teste, que aceita tokens fictícios com os papéis. Eles exercitam os filtros de segurança de verdade (401, 403) sem depender de um servidor de identidade rodando.
+- **Credenciais de desenvolvimento versionadas (limitação atual).** Senhas dos usuários de teste, do admin e do secret do client estão no repositório, só para uso local. Em produção, viriam de um cofre ou de variáveis de ambiente.
 - **Documentação aberta em desenvolvimento (limitação atual).** As rotas `/swagger-ui` e `/v3/api-docs` são liberadas sem autenticação, mas os endpoints da API continuam protegidos. Em produção, a documentação deve ser restringida ou desligada (`springdoc.api-docs.enabled=false` e `springdoc.swagger-ui.enabled=false`).
 - **Código organizado por funcionalidade.** Os pacotes `plantao`, `seguranca`, `erro` e `documentacao` agrupam o que muda junto.
 
@@ -146,7 +183,8 @@ Usuários de **desenvolvimento local** (em memória; não usar em produção):
 - [x] Testes de integração e CI com GitHub Actions
 - [x] Documentação das decisões técnicas
 - [x] Documentação interativa da API com Swagger/OpenAPI
-- [ ] Autenticação com OAuth2 e Keycloak (authorization code e client credentials)
+- [x] API protegida por OAuth2 com Keycloak (client credentials) e realm versionado
+- [ ] Login de usuário por authorization code com PKCE
 - [ ] Front-end em TypeScript consumindo a API
 
 ## Autor
