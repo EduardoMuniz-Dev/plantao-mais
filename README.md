@@ -184,7 +184,7 @@ O realm `plantao` (papéis, client `plantao-m2m` e usuários de teste) está ver
 - [x] Documentação das decisões técnicas
 - [x] Documentação interativa da API com Swagger/OpenAPI
 - [x] API protegida por OAuth2 com Keycloak (client credentials) e realm versionado
-- [ ] Login de usuário por authorization code com PKCE
+- [x] Login de usuário por authorization code com PKCE
 - [ ] Front-end em TypeScript consumindo a API
 
 ## Autor
